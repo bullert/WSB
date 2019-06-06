@@ -1,30 +1,22 @@
 #!/bin/bash
 
+arg=$1
+system_info_file="$HOME/system_info.txt"
+delayTime=2s
+
 outputWidth=80
 divider=""
 subDivider=""
-system_info_file="$HOME/system_info.txt"
+
+# on init
 
 for i in $( seq 1 $outputWidth ); do divider+="*" subDivider+="-"; done
 
-main_switch $1
-
-main_switch(){
-  case $1 in
-    0) exit 1 ;;
-    1) serve_system_info_file ;;
-    2) system_info ;;
-    3) echo 3 ;;
-    4) echo 4 ;;
-    5) echo 5 ;;
-    6) echo 6 ;;
-    *) show_menu ;;
-  esac
-}
+# region menu
 
 show_menu(){
   clear
-  printf "\n$divider\n"
+  printf "$divider\n"
   printf "* %-$((outputWidth-4))s *\n" \
   "Wybierz opcje [0 - 6] lub wywolaj skrypt z argumentem" \ \
   "0 - Opuszczenie skryptu" \
@@ -33,38 +25,33 @@ show_menu(){
   "3 - Utworz grupe" \
   "4 - Utworz uzytkownika" \
   "5 - Pobierz i przetworz plik" \
-  "6 - Wyszukaj frazy w plikach"
-  printf "$divider\n\n"
-  read -p "Wybierz opcje: " chosedOption
-  main_switch $chosedOption
+  "6 - Wyszukaj frazy w plikach" \ ""
+  printf "$divider\n"
+  read -p "Wybierz opcje: " arg
 }
 
 clear(){
   printf "\ec"
 }
 
-# if [ $# -eq 0 ] ; then
-#   showMenu
-# else
-#   chosedOption=$1
-# fi
+# endregion menu
 
 # region zad1
 
-serve_system_info_file(){
+save_system_info(){
+  clear
   if [ -f $system_info_file ] ; then
     rm $system_info_file
     echo "Usunieto istniejacy plik $system_info_file"
   fi
-  system_info > $system_info_file
+  get_system_info > $system_info_file
   echo "Utworzono plik $system_info_file"
   echo "Zapisano informacje o systemie"
-  sleep 2s
+  sleep $delayTime
   show_menu
 }
 
-system_info(){
-  clear
+get_system_info(){
   printf "*** Informacje o systemie ***\n"
   printf "%-21s : %s\n" \
   "Zalogowany uzytkownik" $USER \
@@ -89,3 +76,35 @@ system_info(){
 }
 
 # endregion zad1
+
+# region zad2
+
+read_system_info(){
+  clear
+  if [ -f $system_info_file ] ; then
+    cat $system_info_file
+  else
+    echo "Plik ${system_info_file} nie istnieje."
+  fi
+  sleep $delayTime
+  show_menu
+}
+
+# endregion zad2
+
+# region mainloop
+
+until [ $arg -eq 0 ]; do
+  case $arg in
+    1) save_system_info ;;
+    2) read_system_info ;;
+    # 3)  ;;
+    # 4)  ;;
+    # 5)  ;;
+    # 6)  ;;
+    0) exit 1 ;;
+    *) show_menu ;;
+  esac
+done
+
+# endregion mainloop
