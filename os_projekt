@@ -2,22 +2,35 @@
 
 arg=$1
 system_info_file="$HOME/system_info.txt"
-delayTime=2s
+basic_time_delay=5
 
-outputWidth=80
+default_foreground="\e[39m"
+default_background="\e[49m"
+red_foreground="\e[91m"
+cyan_foreground="\e[96m"
+gray_background="\e[100m"
+
+default_style="${default_foreground}${default_background}"
+mark_style="${cyan_foreground}${gray_background}"
+error_style="${red_foreground}"
+
+output_width=80
 divider=""
-subDivider=""
+sub_divider=""
 
-# on init
+file_not_exist_msg="Plik nie istnieje."
+file_not_exist_or_empty_msg="Plik nie istnieje lub jest pusty."
+permission_denied_msg="Wywolaj program z uprawnieniami root by utworzyc"
 
-for i in $( seq 1 $outputWidth ); do divider+="*" subDivider+="-"; done
+for i in $( seq 1 $output_width ); do divider+="*" sub_divider+="-"; done
+
 
 # region menu
 
 show_menu(){
   clear
   printf "$divider\n"
-  printf "* %-$((outputWidth-4))s *\n" \
+  printf "* %-$((output_width-4))s *\n" \
   "Wybierz opcje [0 - 6] lub wywolaj skrypt z argumentem" \ \
   "0 - Opuszczenie skryptu" \
   "1 - Zbierz informacje o systemie" \
@@ -30,8 +43,34 @@ show_menu(){
   read -p "Wybierz opcje: " arg
 }
 
+show_timer(){
+  duration=$1
+  prefix="$sub_divider\nPowrot do menu nastapi za: "
+  suffix=" s."
+  bufferLen=10
+
+  echo -ne "$prefix"
+
+  for i in $( seq 0 $duration ); do
+
+    buffer=""
+    ellapsed=$(( $duration - $i));
+    diff=$(( $bufferLen - ${#suffix} - ${#ellapsed} ))
+
+    for j in $( seq 1 $diff ) ; do buffer+=" "; done;
+    for j in $( seq 1 $bufferLen ) ; do buffer+="\b"; done;
+
+    echo -ne "$ellapsed$suffix$buffer"
+    sleep 1;
+  done;
+}
+
 clear(){
-  printf "\ec"
+  echo -en "\ec"
+}
+
+err(){
+  echo -e ${error_style}$1${default_style}
 }
 
 # endregion menu
@@ -46,32 +85,33 @@ save_system_info(){
   fi
   get_system_info > $system_info_file
   echo "Utworzono plik $system_info_file"
-  echo "Zapisano informacje o systemie"
-  sleep $delayTime
+  echo "Zapisano informacje o systemie."
+  show_timer $basic_time_delay
   show_menu
 }
 
 get_system_info(){
-  printf "*** Informacje o systemie ***\n"
+  printf "*** Informacje o systemie ***\n\n"
   printf "%-21s : %s\n" \
   "Zalogowany uzytkownik" $USER \
   "Katalog domowy" $HOME
   printf "%s\n" \
+  "$sub_divider" \
   "Informacje o pamieci:" \
-  "$subDivider" \
+  "$sub_divider" \
   "$(free)" \
-  "$subDivider" \
+  "$sub_divider" \
   "Calkowita przestrzen na dysku:" \
-  "$subDivider" \
+  "$sub_divider" \
   "$(df)" \
-  "$subDivider" \
+  "$sub_divider" \
   "Przestrzen katalogu domowego uzytkownika:" \
-  "$(du -sh $HOME)" \
-  "$subDivider"
+  "$(du -sh $HOME)"
   if [ $EUID == 0 ]; then
-    printf "Przestrzen katalogow domowych wszystkich uzytkownikow:"
-    printf "\n%s\n" "$(du -shc /home/*)"
-    printf "%s$subDivider\n"
+    printf "%s\n" \
+    "$sub_divider" \
+    "Przestrzen katalogow domowych wszystkich uzytkownikow:" \
+    "$(du -shc /home/*)"
   fi
 }
 
@@ -83,26 +123,175 @@ read_system_info(){
   clear
   if [ -f $system_info_file ] ; then
     cat $system_info_file
+    show_timer $basic_time_delay
   else
-    echo "Plik ${system_info_file} nie istnieje."
+    err "$file_not_exist_msg"
+    show_timer $basic_time_delay
   fi
-  sleep $delayTime
   show_menu
 }
 
 # endregion zad2
 
+# region zad3
+
+add_group(){
+  clear
+  if [ $EUID == 0 ]; then
+    while :; do
+
+      read -p "Podaj nazwe grupy: " group_name
+      if [ "$group_name" == "" ] ; then
+        err "Nazwa grupy nie może być pusta."
+      else
+
+        groups_list=$(compgen -g)
+        is_group_exist=false
+
+        for group in $groups_list ; do
+          if [ "$group" = "$group_name" ] ; then
+            is_group_exist=true
+            break
+          fi
+        done
+
+        if [ $is_group_exist = false ] ; then
+          echo $(addgroup "$group_name")
+          show_timer $basic_time_delay
+          show_menu
+        else
+          err "Istnieje juz grupa z poddana nazwa."
+        fi
+      fi
+    done
+  else
+    err "$permission_denied_msg grupe."
+  fi
+  show_timer $basic_time_delay
+  show_menu
+}
+
+# endregion zad3
+
+# region zad4
+
+add_user(){
+  clear
+  if [ $EUID == 0 ]; then
+    while :; do
+
+      read -p "Podaj nazwe uzytkownika: " user_name
+      if [ "$user_name" == "" ] ; then
+        err "Nazwa uzytkownika nie może być pusta."
+      else
+
+        users_list=$(compgen -u)
+        is_user_exist=false
+
+        for user in $users_list ; do
+          if [ "$user" = "$user_name" ] ; then
+            is_user_exist=true
+            break
+          fi
+        done
+
+        if [ $is_user_exist = false ] ; then
+          echo $(adduser "$user_name" --gecos "First Last,RoomNumber,WorkPhone,HomePhone")
+          show_timer $basic_time_delay
+          show_menu
+        else
+          err "Istnieje juz uzytkownik z poddana nazwa."
+        fi
+      fi
+    done
+  else
+    err "$permission_denied_msg uzytkownika."
+  fi
+  show_timer $basic_time_delay
+  show_menu
+}
+
+# endregion zad4
+
+# region zad5
+
+add_datetime_suffix(){
+  clear
+  while :; do
+    read -p "Podaj nazwe pliku: " file_name
+    if [ -f "$file_name" ] ; then
+      echo $(date "+%d/%m/%Y %H:%M:%S") >> $file_name
+      echo "Dopisano date do pliku."
+      break
+    else
+      err "$file_not_exist_msg"
+    fi
+  done
+  show_timer $basic_time_delay
+  show_menu
+}
+
+# endregion zad5
+
+# region zad6
+
+find_string_in_file(){
+  clear
+  while :; do
+    read -p "Podaj nazwe pliku: " file_name
+    if [ -s "$file_name" ] ; then
+
+      while :; do
+        read -p "Podaj szukany ciag znakow: " searched_string
+
+        if [ "$searched_string" != "" ] ; then
+
+          clear
+          file_content=$(cat $file_name)
+          content_length=${#file_content}
+          string_length=${#searched_string}
+          counter=0
+
+          for (( i=0; i<$content_length; i++ )) ; do
+            if [ "$searched_string" == "${file_content:$i:$string_length}" ] ; then
+              echo -en "${mark_style}${file_content:$i:$string_length}${default_style}"
+              ((i+=$string_length-1))
+              ((counter++))
+            else
+              echo -en "${file_content:$i:1}"
+            fi
+          done
+
+          echo -e "\n"
+          if [ $counter -eq 0 ] ; then
+            echo "Nie znaleziono szukanego ciagu."
+          else
+            echo "Znalezionych fraz: $counter"
+          fi
+        else
+          err "Podany ciag jest pusty."
+        fi
+      done
+
+    else
+      err "$file_not_exist_or_empty_msg"
+    fi
+  done
+  show_menu
+}
+
+# endregion zad6
+
 # region mainloop
 
-until [ $arg -eq 0 ]; do
+until [ $arg -eq 0 ] ; do
   case $arg in
     1) save_system_info ;;
     2) read_system_info ;;
-    # 3)  ;;
-    # 4)  ;;
-    # 5)  ;;
-    # 6)  ;;
-    0) exit 1 ;;
+    3) add_group ;;
+    4) add_user ;;
+    5) add_datetime_suffix ;;
+    6) find_string_in_file ;;
     *) show_menu ;;
   esac
 done
